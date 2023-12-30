@@ -1,6 +1,7 @@
 package lt.uhealth.alpi.svg.model;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -13,6 +14,7 @@ public record MagicItemWithNotes(int index,
                                  String magicItemString,
                                  AtomicReference<Map<Integer, MagicItemWithNotes>> dependsOn,
                                  AtomicReference<Map<Integer, MagicItemWithNotes>> dependents,
+                                 AtomicBoolean pickedForRequest,
                                  AtomicReference<Answer> answer) {
 
     public boolean isIndependant(){
@@ -66,6 +68,7 @@ public record MagicItemWithNotes(int index,
 
         MagicItem magicItem = JsonReader.readValue(json, MagicItem.class);
         return new MagicItemWithNotes(index, magic, magicItem, magicItemString,
-                new AtomicReference<>(), new AtomicReference<>(), new AtomicReference<>());
+                new AtomicReference<>(), new AtomicReference<>(), new AtomicBoolean(false),
+                new AtomicReference<>());
     }
 }

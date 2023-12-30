@@ -56,6 +56,7 @@ public class AlpiCoService {
         LOG.debug("processMagic index: {}", magicItemWithNotes.magicItem().index());
         return postMagic(magicItemWithNotes)
                 .flatMapIterable(MagicItemWithNotes::findReadyDependents)
+                .filter(m -> !m.pickedForRequest().getAndSet(true))
                 .flatMap(this::processMagic);
     }
 
