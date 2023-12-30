@@ -1,0 +1,7 @@
+alpico:
+  url: "https://europe-west1-uh-protected.cloudfunctions.net/aipico"
+
+logging:
+  level:
+    lt:
+      uhealth: DEBUG
