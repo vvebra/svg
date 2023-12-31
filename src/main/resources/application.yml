@@ -1,4 +1,4 @@
-alpico:
+aipico:
   url: "https://europe-west1-uh-protected.cloudfunctions.net/aipico"
 
 logging:
