@@ -78,7 +78,7 @@ public class AipiCoService {
             }
         }
 
-        mono = mono
+        Mono<MagicItemWithNotes> mono2 = Mono.just(magicItemWithNotes)
                 .doOnNext(m -> LOG.debug("Requesting postMagic with index: {}", m.magicItem().index()))
                 .flatMap(m -> aipiCoClient.postMagic(m.magic(), Payload.fromMagicItemWithNotes(m)))
                 .onErrorMap(ExceptionMapper::fromWebClientResponseException)
@@ -88,13 +88,10 @@ public class AipiCoService {
                         .filter(t -> !tooEarlyOrTooLate(t))
                         .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
                 .map(magicItemWithNotes::withAnswer)
-                .doOnNext(m -> LOG.debug("Answer from postMagic {}: {}", m.magicItem().index(), m.answer()));
+                .doOnNext(m -> LOG.debug("Answer from postMagic {}: {}", m.magicItem().index(), m.answer()))
+                .onErrorResume(ignored -> prevThrowable == null, t -> postMagic(magicItemWithNotes, t));
 
-        if (prevThrowable == null){
-            mono = mono.onErrorResume(t -> postMagic(magicItemWithNotes, t));
-        }
-
-        return mono;
+        return mono.flatMap(ignored -> mono2);
     }
 
     boolean tooEarlyOrTooLate(Throwable t){
