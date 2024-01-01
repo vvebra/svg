@@ -30,4 +30,28 @@ public record Issue(String code, String message, String expected, String receive
 
         return params.expected().after() - params.actual();
     }
+
+    public boolean isMissingDependencies(){
+        return message != null && message.compareToIgnoreCase("Required") == 0
+                && code != null && code.equals("invalid_type")
+                && path != null && path.size() == 2
+                && path.getFirst().equals("responses") && isInteger(path.get(1));
+    }
+
+    public Integer getMissingDependency(){
+        if (!isMissingDependencies()){
+            return null;
+        }
+
+        return Integer.parseInt(path.get(1));
+    }
+
+    boolean isInteger(String s){
+        try {
+            Integer.parseInt(s);
+            return true;
+        } catch (NumberFormatException nfe){
+            return false;
+        }
+    }
 }

@@ -3,8 +3,6 @@ package lt.uhealth.aipi.svg.model;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import lt.uhealth.aipi.svg.util.JsonReader;
 
@@ -14,6 +12,7 @@ public record MagicItemWithNotes(int index,
                                  String magicItemString,
                                  AtomicReference<Map<Integer, MagicItemWithNotes>> dependsOn,
                                  AtomicReference<Map<Integer, MagicItemWithNotes>> dependents,
+                                 AtomicReference<Map<Integer, MagicItemWithNotes>> allMagicItemWithNotes,
                                  AtomicBoolean pickedForRequest,
                                  AtomicReference<Answer> answer) {
 
@@ -31,11 +30,15 @@ public record MagicItemWithNotes(int index,
     }
 
     public MagicItemWithNotes withDependsOn(Map<Integer, MagicItemWithNotes> dependsOn) {
-        this.dependsOn.set(getDependencies().stream()
-                .map(dependsOn::get)
-                .collect(Collectors.toUnmodifiableMap(m -> m.magicItem.index(), Function.identity())));
+        this.dependsOn.set(dependsOn);
 
         return this;
+    }
+
+    public void addDependsOn(Integer dependsOnIndex){
+        MagicItemWithNotes other = allMagicItemWithNotes.get().get(dependsOnIndex);
+        dependsOn.get().put(dependsOnIndex, other);
+        other.dependents.get().put(magicItem.index(), this);
     }
 
     public MagicItemWithNotes withDependents(Map<Integer, MagicItemWithNotes> dependents) {
@@ -43,12 +46,7 @@ public record MagicItemWithNotes(int index,
         return this;
     }
 
-    public MagicItemWithNotes withImmutableDependents(){
-        this.dependents.set(Map.copyOf(this.dependents.get()));
-        return this;
-    }
-
-    boolean isReady(){
+    public boolean isReady(){
         return dependsOn.get().values().stream().allMatch(m -> m.answer().get() != null);
     }
 
@@ -68,7 +66,7 @@ public record MagicItemWithNotes(int index,
 
         MagicItem magicItem = JsonReader.readValue(json, MagicItem.class);
         return new MagicItemWithNotes(index, magic, magicItem, magicItemString,
-                new AtomicReference<>(), new AtomicReference<>(), new AtomicBoolean(false),
-                new AtomicReference<>());
+                new AtomicReference<>(), new AtomicReference<>(), new AtomicReference<>(),
+                new AtomicBoolean(false), new AtomicReference<>());
     }
 }

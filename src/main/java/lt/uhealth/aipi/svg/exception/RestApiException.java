@@ -3,6 +3,7 @@ package lt.uhealth.aipi.svg.exception;
 import lt.uhealth.aipi.svg.model.RestError;
 
 import java.util.Optional;
+import java.util.Set;
 
 public class RestApiException extends RuntimeException {
 
@@ -35,6 +36,14 @@ public class RestApiException extends RuntimeException {
 
     public Long tooEarlyByMillis() {
         return Optional.ofNullable(restError).map(RestError::tooEarlyByMillis).orElse(null);
+    }
+
+    public boolean isMissingDependencies() {
+        return restError != null && restError.isMissingDependencies();
+    }
+
+    public Set<Integer> getMissingDependencies() {
+        return Optional.ofNullable(restError).map(RestError::getMissingDependencies).orElse(Set.of());
     }
 
     public RestError getRestError() {

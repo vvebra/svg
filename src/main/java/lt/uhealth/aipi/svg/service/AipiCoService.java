@@ -16,6 +16,7 @@ import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -46,8 +47,11 @@ public class AipiCoService {
     public Flux<MagicItemWithNotes> solveMagicItems(List<MagicItemWithNotes> magicItemWithNotes){
         return Mono.just(magicItemWithNotes)
                 .map(this::enrichMagicItems)
-                .map(this::findIndependentMagicItems)
-                .doOnNext(l -> LOG.debug("Independent magicItems: {}",
+                .map(l -> l.stream()
+                        .filter(MagicItemWithNotes::isReady)
+                        .filter(m -> !m.pickedForRequest().getAndSet(true))
+                        .toList())
+                .doOnNext(l -> LOG.debug("Starting with magicItems: {}",
                         l.stream().map(m -> m.magicItem().index()).toList()))
                 .flatMapIterable(Function.identity())
                 .flatMap(this::solveMagicItemWithDependents)
@@ -76,12 +80,23 @@ public class AipiCoService {
     Mono<MagicItemWithNotes> postMagic(MagicItemWithNotes magicItemWithNotes, Throwable prevThrowable){
         Mono<MagicItemWithNotes> mono = Mono.just(magicItemWithNotes);
         if (prevThrowable != null){
-            if (prevThrowable instanceof RestApiException rae && rae.isTooEarly()){
+            if (prevThrowable instanceof RestApiException rae && rae.isTooEarly()) {
                 long tooEarlyByMillis = rae.tooEarlyByMillis();
                 mono = mono
                         .doOnNext(m -> LOG.debug("Delaying postMagic for magicItem {}: {} ms",
                                 m.magicItem().index(), tooEarlyByMillis))
                         .delayElement(Duration.ofMillis(tooEarlyByMillis));
+            } else if (prevThrowable instanceof RestApiException rae && rae.isMissingDependencies()){
+                Set<Integer> missingDependencies = rae.getMissingDependencies();
+                LOG.debug("Missing dependencies of magicItem: {}: {}",
+                        magicItemWithNotes.magicItem().index(), missingDependencies);
+
+                missingDependencies.forEach(magicItemWithNotes::addDependsOn);
+                magicItemWithNotes.pickedForRequest().set(false);
+
+                if (!pickForRequestIfReady(magicItemWithNotes)){
+                    return Mono.empty();
+                }
             } else {
                 return Mono.error(prevThrowable);
             }
@@ -94,31 +109,43 @@ public class AipiCoService {
                 .doOnError(t -> LOG.error("Error while postMagic for magicItem {}: {}: {}",
                         magicItemWithNotes.magicItem().index(), t.getClass(), t.getMessage()))
                 .retryWhen(Retry.fixedDelay(3, Duration.ofMillis(10))
-                        .filter(t -> !tooEarlyOrTooLate(t))
+                        .filter(t -> !tooEarlyOrTooLateOrMissingDependencies(t))
                         .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
                 .map(magicItemWithNotes::withAnswer)
                 .doOnNext(m -> LOG.debug("Answer from postMagic for magicItem {}: {}",
                         m.magicItem().index(), m.answer()))
-                .onErrorResume(ignored -> prevThrowable == null, t -> postMagic(magicItemWithNotes, t));
+                .onErrorResume(t -> postMagic(magicItemWithNotes, t));
 
         return mono.flatMap(ignored -> mono2);
     }
 
-    boolean tooEarlyOrTooLate(Throwable t){
-        return (t instanceof RestApiException rae) && (rae.isTooEarly() || rae.isTooLate());
+    boolean pickForRequestIfReady(MagicItemWithNotes magicItemWithNotes){
+        boolean isReady = magicItemWithNotes.isReady();
+        if (isReady && !magicItemWithNotes.pickedForRequest().getAndSet(true)){
+            LOG.debug("magicItem: {} is ready and successfully picked for request",
+                    magicItemWithNotes.magicItem().index());
+            return true;
+        } else {
+            if (isReady){
+                LOG.debug("magicItem: {} is ready but picked for request by other",
+                        magicItemWithNotes.magicItem().index());
+            } else {
+                LOG.debug("magicItem: {} is not ready", magicItemWithNotes.magicItem().index());
+            }
+
+            return false;
+        }
+    }
+
+    boolean tooEarlyOrTooLateOrMissingDependencies(Throwable t){
+        return (t instanceof RestApiException rae)
+                && (rae.isTooEarly() || rae.isTooLate() || rae.isMissingDependencies());
     }
 
     List<MagicItemWithNotes> enrichMagicItems(List<MagicItemWithNotes> magicItemsWithNotes) {
         Map<Integer, MagicItemWithNotes> magicItemsWithNotesMap = magicItemsWithNotes.stream()
-                .map(m -> m.withDependents(new HashMap<>()))
-                .collect(Collectors.toMap(m -> m.magicItem().index(), Function.identity()));
-
-        magicItemsWithNotesMap.values().forEach(m -> {
-            Set<Integer> dependencies = m.getDependencies();
-            dependencies.forEach(d -> magicItemsWithNotesMap.get(d).dependents().get().put(m.magicItem().index(), m));
-        });
-
-        magicItemsWithNotesMap.values().forEach(MagicItemWithNotes::withImmutableDependents);
+                .map(m -> m.withDependents(new ConcurrentHashMap<>()))
+                .collect(Collectors.toUnmodifiableMap(m -> m.magicItem().index(), Function.identity()));
 
         if (magicItemsWithNotesMap.size() != magicItemsWithNotes.size()) {
             throw new AppRuntimeException(
@@ -126,15 +153,10 @@ public class AipiCoService {
                             .formatted(magicItemsWithNotesMap.size(), magicItemsWithNotes.size()));
         }
 
-        magicItemsWithNotes.forEach(m -> m.withDependsOn(magicItemsWithNotesMap));
+        magicItemsWithNotes.forEach(m -> m.withDependsOn(new ConcurrentHashMap<>()));
+        magicItemsWithNotes.forEach(m -> m.allMagicItemWithNotes().set(magicItemsWithNotesMap));
 
         return magicItemsWithNotes;
-    }
-
-    List<MagicItemWithNotes> findIndependentMagicItems(List<MagicItemWithNotes> magicItems){
-        return magicItems.stream()
-                .filter(MagicItemWithNotes::isIndependant)
-                .toList();
     }
 
     List<MagicItemWithNotes> toMagicItemsWithNotes(String magic, List<String> magicItemStrings){

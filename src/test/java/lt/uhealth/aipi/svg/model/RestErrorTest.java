@@ -2,13 +2,15 @@ package lt.uhealth.aipi.svg.model;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class RestErrorTest {
 
     @Test
-    void givenNooEarlyOrTooLateErrorString_whenFromErrorString_thenCorrect() {
+    void givenTooEarlyOrTooLateErrorString_whenFromErrorString_thenCorrect() {
         //given
         String errorString = """
                 {
@@ -113,5 +115,61 @@ class RestErrorTest {
         assertFalse(restError.isTooEarly());
         assertFalse(restError.isTooLate());
         assertNull(restError.tooEarlyByMillis());
+    }
+
+    @Test
+    void givenMissingDepErrorString_whenFromErrorString_thenCorrect(){
+        //given
+        String errorString = """
+                {
+                 	"issues": [
+                 		{
+                 			"code": "invalid_type",
+                 			"expected": "string",
+                 			"received": "undefined",
+                 			"path": [
+                 				"responses",
+                 				"27"
+                 			],
+                 			"message": "Required"
+                 		},
+                        {
+                            "code": "invalid_type",
+                            "expected": "string",
+                            "received": "undefined",
+                            "path": [
+                                "responses",
+                                "36"
+                            ],
+                            "message": "Required"
+                        }
+                 	],
+                 	"name": "AIπ.Co Error",
+                 	"message": "Validation problems. Check issues."
+                }
+                """;
+
+        //when
+        RestError restError = RestError.fromErrorString(errorString);
+
+        //then
+        assertEquals("AIπ.Co Error", restError.name());
+        assertEquals("Validation problems. Check issues.", restError.message());
+        assertEquals(2, restError.issues().size());
+
+        Issue issue = restError.issues().getFirst();
+        assertEquals("invalid_type", issue.code());
+        assertEquals("Required", issue.message());
+        assertEquals("string", issue.expected());
+        assertEquals("undefined", issue.received());
+        assertEquals(2, issue.path().size());
+        assertEquals("responses", issue.path().getFirst());
+        assertEquals("27", issue.path().get(1));
+
+        assertTrue(restError.isMissingDependencies());
+        Set<Integer> deps = restError.getMissingDependencies();
+        assertEquals(2, deps.size());
+        assertTrue(deps.contains(27));
+        assertTrue(deps.contains(36));
     }
 }
