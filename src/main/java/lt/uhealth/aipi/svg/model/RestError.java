@@ -15,14 +15,14 @@ public record RestError(String name, String message, List<Issue> issues) {
         return issues != null && issues.stream().anyMatch(Issue::isTooEarly);
     }
 
-    public Long tooEarly(){
+    public Long tooEarlyByMillis(){
         if (issues == null){
             return null;
         }
 
         return issues.stream()
                 .filter(Issue::isTooEarly)
-                .map(Issue::tooEarly)
+                .map(Issue::tooEarlyByMillis)
                 .filter(Objects::nonNull)
                 .findAny()
                 .orElse(null);

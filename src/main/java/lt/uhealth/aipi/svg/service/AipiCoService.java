@@ -43,24 +43,33 @@ public class AipiCoService {
                 .doOnNext(rez -> LOG.debug("getMagic result size is {}", rez.size()));
     }
 
-    public Flux<MagicItemWithNotes> processMagicItems(List<MagicItemWithNotes> magicItemWithNotes){
+    public Flux<MagicItemWithNotes> solveMagicItems(List<MagicItemWithNotes> magicItemWithNotes){
         return Mono.just(magicItemWithNotes)
                 .map(this::enrichMagicItems)
-                .flatMapIterable(this::getIndependentMagicItems)
-                .flatMap(this::processMagic)
-                .doOnComplete(() -> LOG.debug("processMagic completed"))
+                .map(this::findIndependentMagicItems)
+                .doOnNext(l -> LOG.debug("Independent magicItems: {}",
+                        l.stream().map(m -> m.magicItem().index()).toList()))
+                .flatMapIterable(Function.identity())
+                .flatMap(this::solveMagicItemWithDependents)
+                .doOnComplete(() -> LOG.debug("solveMagicItemsWithDependents completed"))
                 .thenMany(Flux.fromIterable(magicItemWithNotes));
     }
 
-    public Flux<MagicItemWithNotes> processMagic(MagicItemWithNotes magicItemWithNotes){
-        LOG.debug("processMagic index: {}", magicItemWithNotes.magicItem().index());
+    Flux<MagicItemWithNotes> solveMagicItemWithDependents(MagicItemWithNotes magicItemWithNotes){
+        LOG.debug("solveMagicItemWithDependents for MagicItem: {}", magicItemWithNotes.magicItem().index());
         return postMagic(magicItemWithNotes)
-                .flatMapIterable(MagicItemWithNotes::findReadyDependents)
-                .filter(m -> !m.pickedForRequest().getAndSet(true))
-                .flatMap(this::processMagic);
+                .map(MagicItemWithNotes::findReadyDependents)
+                .map(l -> l.stream()
+                        .filter(m -> !m.pickedForRequest().getAndSet(true))
+                        .toList())
+                .doOnNext(l -> LOG.debug("Picked ready for request dependents of MagicItem: {}: {}",
+                        magicItemWithNotes.magicItem().index(),
+                        l.stream().map(m -> m.magicItem().index()).toList()))
+                .flatMapIterable(Function.identity())
+                .flatMap(this::solveMagicItemWithDependents);
     }
 
-    public Mono<MagicItemWithNotes> postMagic(MagicItemWithNotes magicItemWithNotes){
+    Mono<MagicItemWithNotes> postMagic(MagicItemWithNotes magicItemWithNotes){
         return postMagic(magicItemWithNotes, null);
     }
 
@@ -68,27 +77,28 @@ public class AipiCoService {
         Mono<MagicItemWithNotes> mono = Mono.just(magicItemWithNotes);
         if (prevThrowable != null){
             if (prevThrowable instanceof RestApiException rae && rae.isTooEarly()){
-                long tooEarlyBy = rae.tooEarlyBy();
+                long tooEarlyByMillis = rae.tooEarlyByMillis();
                 mono = mono
-                        .doOnNext(m -> LOG.debug("Delaying postMagic with index {}: {} ms",
-                                m.magicItem().index(), tooEarlyBy))
-                        .delayElement(Duration.ofMillis(tooEarlyBy));
+                        .doOnNext(m -> LOG.debug("Delaying postMagic for magicItem {}: {} ms",
+                                m.magicItem().index(), tooEarlyByMillis))
+                        .delayElement(Duration.ofMillis(tooEarlyByMillis));
             } else {
                 return Mono.error(prevThrowable);
             }
         }
 
         Mono<MagicItemWithNotes> mono2 = Mono.just(magicItemWithNotes)
-                .doOnNext(m -> LOG.debug("Requesting postMagic with index: {}", m.magicItem().index()))
+                .doOnNext(m -> LOG.debug("Requesting postMagic for magicItem: {}", m.magicItem().index()))
                 .flatMap(m -> aipiCoClient.postMagic(m.magic(), Payload.fromMagicItemWithNotes(m)))
                 .onErrorMap(ExceptionMapper::fromWebClientResponseException)
-                .doOnError(t -> LOG.error("Error while postMagic {}: {}: {}",
+                .doOnError(t -> LOG.error("Error while postMagic for magicItem {}: {}: {}",
                         magicItemWithNotes.magicItem().index(), t.getClass(), t.getMessage()))
                 .retryWhen(Retry.fixedDelay(3, Duration.ofMillis(10))
                         .filter(t -> !tooEarlyOrTooLate(t))
                         .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
                 .map(magicItemWithNotes::withAnswer)
-                .doOnNext(m -> LOG.debug("Answer from postMagic {}: {}", m.magicItem().index(), m.answer()))
+                .doOnNext(m -> LOG.debug("Answer from postMagic for magicItem {}: {}",
+                        m.magicItem().index(), m.answer()))
                 .onErrorResume(ignored -> prevThrowable == null, t -> postMagic(magicItemWithNotes, t));
 
         return mono.flatMap(ignored -> mono2);
@@ -98,7 +108,7 @@ public class AipiCoService {
         return (t instanceof RestApiException rae) && (rae.isTooEarly() || rae.isTooLate());
     }
 
-    public List<MagicItemWithNotes> enrichMagicItems(List<MagicItemWithNotes> magicItemsWithNotes) {
+    List<MagicItemWithNotes> enrichMagicItems(List<MagicItemWithNotes> magicItemsWithNotes) {
         Map<Integer, MagicItemWithNotes> magicItemsWithNotesMap = magicItemsWithNotes.stream()
                 .map(m -> m.withDependents(new HashMap<>()))
                 .collect(Collectors.toMap(m -> m.magicItem().index(), Function.identity()));
@@ -121,7 +131,7 @@ public class AipiCoService {
         return magicItemsWithNotes;
     }
 
-    List<MagicItemWithNotes> getIndependentMagicItems(List<MagicItemWithNotes> magicItems){
+    List<MagicItemWithNotes> findIndependentMagicItems(List<MagicItemWithNotes> magicItems){
         return magicItems.stream()
                 .filter(MagicItemWithNotes::isIndependant)
                 .toList();

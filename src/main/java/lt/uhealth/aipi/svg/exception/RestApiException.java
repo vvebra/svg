@@ -33,8 +33,8 @@ public class RestApiException extends RuntimeException {
         return restError != null && restError.isTooEarly();
     }
 
-    public Long tooEarlyBy() {
-        return Optional.ofNullable(restError).map(RestError::tooEarly).orElse(null);
+    public Long tooEarlyByMillis() {
+        return Optional.ofNullable(restError).map(RestError::tooEarlyByMillis).orElse(null);
     }
 
     public RestError getRestError() {

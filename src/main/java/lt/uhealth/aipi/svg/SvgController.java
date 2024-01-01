@@ -31,7 +31,7 @@ public class SvgController {
 
         return aipiCoService.getMagic(magic)
                 .flux()
-                .flatMap(aipiCoService::processMagicItems)
+                .flatMap(aipiCoService::solveMagicItems)
                 .sort(Comparator.comparingInt(MagicItemWithNotes::index))
                 .map(m -> m.answer().get().payload())
                 .reduce("", String::concat)

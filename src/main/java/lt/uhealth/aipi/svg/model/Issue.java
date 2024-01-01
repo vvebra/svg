@@ -20,7 +20,7 @@ public record Issue(String code, String message, String expected, String receive
                 && params.actual() <= params.expected().after();
     }
 
-    public Long tooEarly(){
+    public Long tooEarlyByMillis(){
         if (params == null || params.expected() == null
                 || params.expected().after() == null
                 || params.actual() == null

@@ -18,7 +18,7 @@ public record Payload(String payload, Map<String, String> responses) {
 
     private static MagicItemWithNotes checkAnswerExists(MagicItemWithNotes magicItemWithNotes){
         if (magicItemWithNotes.answer().get() == null){
-            throw new AppRuntimeException("Magic item with index=%s does not have an answer"
+            throw new AppRuntimeException("Magic item '%s' does not have an answer"
                     .formatted(magicItemWithNotes.magicItem().index()));
         }
 

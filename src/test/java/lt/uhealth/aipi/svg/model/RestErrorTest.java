@@ -48,7 +48,7 @@ class RestErrorTest {
 
         assertTrue(restError.isTooEarly());
         assertFalse(restError.isTooLate());
-        assertEquals(5, restError.tooEarly());
+        assertEquals(5, restError.tooEarlyByMillis());
     }
 
     @Test
@@ -70,7 +70,7 @@ class RestErrorTest {
 
         assertFalse(restError.isTooEarly());
         assertFalse(restError.isTooLate());
-        assertNull(restError.tooEarly());
+        assertNull(restError.tooEarlyByMillis());
     }
 
     @Test
@@ -112,6 +112,6 @@ class RestErrorTest {
 
         assertFalse(restError.isTooEarly());
         assertFalse(restError.isTooLate());
-        assertNull(restError.tooEarly());
+        assertNull(restError.tooEarlyByMillis());
     }
 }
