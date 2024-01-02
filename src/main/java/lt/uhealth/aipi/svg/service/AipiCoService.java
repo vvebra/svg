@@ -19,6 +19,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class AipiCoService {
@@ -159,12 +160,16 @@ public class AipiCoService {
         return magicItemsWithNotes;
     }
 
-    List<MagicItemWithNotes> toMagicItemsWithNotes(String magic, List<String> magicItemStrings){
-        MagicItemWithNotes[] magicItemsWithNotes = new MagicItemWithNotes[magicItemStrings.size()];
-        for (int i = 0; i < magicItemStrings.size(); i++) {
-            magicItemsWithNotes[i] = MagicItemWithNotes.create(i, magic, magicItemStrings.get(i));
-        }
+    List<MagicItemWithNotes> findIndependentMagicItems(List<MagicItemWithNotes> magicItems){
+        return magicItems.stream()
+                .filter(MagicItemWithNotes::isIndependent)
+                .toList();
+    }
 
-        return List.of(magicItemsWithNotes);
+    List<MagicItemWithNotes> toMagicItemsWithNotes(String magic, List<String> magicItemStrings){
+        return Stream.iterate(0, i -> i + 1)
+                .limit(magicItemStrings.size())
+                .map(i -> MagicItemWithNotes.create(i, magic, magicItemStrings.get(i)))
+                .toList();
     }
 }
