@@ -11,17 +11,4 @@ public record MagicItem (String magicString,
                         List<Barrier> barriers,
                         Long iat){
 
-    public boolean isIndependent(){
-        return Stream.ofNullable(barriers)
-                .flatMap(Collection::stream)
-                .allMatch(b -> b.getDependencies().isEmpty());
-    }
-
-    public Set<Integer> getDependencies(){
-        return Stream.ofNullable(barriers)
-                .flatMap(Collection::stream)
-                .flatMap(b -> b.getDependencies().stream())
-                .collect(Collectors.toSet());
-    }
-
 }

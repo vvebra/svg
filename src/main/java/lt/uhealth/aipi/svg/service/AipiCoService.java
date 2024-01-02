@@ -160,12 +160,6 @@ public class AipiCoService {
         return magicItemsWithNotes;
     }
 
-    List<MagicItemWithNotes> findIndependentMagicItems(List<MagicItemWithNotes> magicItems){
-        return magicItems.stream()
-                .filter(MagicItemWithNotes::isIndependent)
-                .toList();
-    }
-
     List<MagicItemWithNotes> toMagicItemsWithNotes(String magic, List<String> magicItemStrings){
         return Stream.iterate(0, i -> i + 1)
                 .limit(magicItemStrings.size())
