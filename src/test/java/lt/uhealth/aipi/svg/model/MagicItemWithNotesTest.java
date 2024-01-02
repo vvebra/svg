@@ -29,7 +29,7 @@ class MagicItemWithNotesTest {
         assertEquals(93, magicItemWithNotes.magicItem().total());
         assertEquals(3, magicItemWithNotes.magicItem().barriers().size());
 
-        Barrier barrier = magicItemWithNotes.magicItem().barriers().getFirst();
+        Barrier barrier = magicItemWithNotes.magicItem().barriers().get(0);
         assertEquals("time", barrier.type());
         assertEquals(2158, barrier.from());
         assertEquals(4643, barrier.until());
@@ -37,6 +37,6 @@ class MagicItemWithNotesTest {
         barrier = magicItemWithNotes.magicItem().barriers().get(1);
         assertEquals("dependency", barrier.type());
         assertEquals(1, barrier.on().size());
-        assertEquals(75, barrier.on().getFirst());
+        assertEquals(75, barrier.on().get(0));
     }
 }

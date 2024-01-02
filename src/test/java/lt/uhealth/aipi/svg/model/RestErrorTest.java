@@ -39,7 +39,7 @@ class RestErrorTest {
         assertEquals("Validation problems. Check issues.", restError.message());
         assertEquals(1, restError.issues().size());
 
-        Issue issue = restError.issues().getFirst();
+        Issue issue = restError.issues().get(0);
         assertEquals("custom", issue.code());
         assertEquals("Request was made too early or too late.", issue.message());
         assertEquals(1886, issue.params().expected().after());
@@ -102,13 +102,13 @@ class RestErrorTest {
         assertEquals("Validation problems. Check issues.", restError.message());
         assertEquals(1, restError.issues().size());
 
-        Issue issue = restError.issues().getFirst();
+        Issue issue = restError.issues().get(0);
         assertEquals("invalid_type", issue.code());
         assertEquals("Expected object, received null", issue.message());
         assertEquals("object", issue.expected());
         assertEquals("null", issue.received());
         assertEquals(1, issue.path().size());
-        assertEquals("responses", issue.path().getFirst());
+        assertEquals("responses", issue.path().get(0));
 
         assertFalse(restError.isTooEarly());
         assertFalse(restError.isTooLate());

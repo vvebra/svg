@@ -1,0 +1,10 @@
+services:
+  svg:
+    image: "svg:0.0.1-SNAPSHOT"
+    ports:
+      - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    read_only: true
