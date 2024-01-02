@@ -133,7 +133,7 @@ public class AipiCoService {
 
     List<MagicItemWithNotes> findIndependentMagicItems(List<MagicItemWithNotes> magicItems){
         return magicItems.stream()
-                .filter(MagicItemWithNotes::isIndependant)
+                .filter(MagicItemWithNotes::isIndependent)
                 .toList();
     }
 
