@@ -16,17 +16,9 @@ public record MagicItemWithNotes(int index,
                                  AtomicBoolean pickedForRequest,
                                  AtomicReference<Answer> answer) {
 
-    public boolean isIndependant(){
-        return this.magicItem.isIndependant();
-    }
-
     public MagicItemWithNotes withAnswer(String answerString) {
         this.answer.set(Answer.fromAnswerString(answerString));
         return this;
-    }
-
-    public Set<Integer> getDependencies() {
-        return magicItem.getDependencies();
     }
 
     public MagicItemWithNotes withDependsOn(Map<Integer, MagicItemWithNotes> dependsOn) {
