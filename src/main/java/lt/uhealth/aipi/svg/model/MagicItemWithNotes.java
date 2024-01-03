@@ -14,6 +14,7 @@ public record MagicItemWithNotes(int index,
                                  String magicItemString,
                                  AtomicReference<Map<Integer, MagicItemWithNotes>> dependsOn,
                                  AtomicReference<Map<Integer, MagicItemWithNotes>> dependents,
+                                 AtomicReference<Long> until,
                                  AtomicBoolean pickedForRequest,
                                  AtomicReference<Answer> answer) {
 
@@ -68,7 +69,38 @@ public record MagicItemWithNotes(int index,
 
         MagicItem magicItem = JsonReader.readValue(json, MagicItem.class);
         return new MagicItemWithNotes(index, magic, magicItem, magicItemString,
-                new AtomicReference<>(), new AtomicReference<>(), new AtomicBoolean(false),
-                new AtomicReference<>());
+                new AtomicReference<>(), new AtomicReference<>(), new AtomicReference<>(),
+                new AtomicBoolean(false), new AtomicReference<>());
+    }
+
+    public Long updateUntilRecursively(){
+        return updateUntilRecursively(new HashSet<>());
+    }
+
+    Long updateUntilRecursively(Set<Integer> currentPath){
+        Long currentValue = until.get();
+        if (currentValue != null){
+            return currentValue;
+        } else if (currentPath.contains(index)){
+            return null;
+        }
+
+        currentPath.add(index);
+
+        long minUntilOfDependents = dependents.get().values().stream()
+                .map(m -> m.updateUntilRecursively(currentPath))
+                .filter(Objects::nonNull)
+                .mapToLong(l -> l)
+                .min()
+                .orElse(Long.MAX_VALUE);
+
+        long untilOfMyself = this.magicItem.getUntil();
+
+        long finalUntil = Math.min(minUntilOfDependents - 50, untilOfMyself);
+        until.set(finalUntil);
+
+        currentPath.remove(index);
+
+        return finalUntil;
     }
 }

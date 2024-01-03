@@ -40,6 +40,7 @@ public class AipiCoService {
                 .doOnError(t -> LOG.error("Error while getMagic {}: {}: {}", magic, t.getClass(), t.getMessage()))
                 .retryWhen(Retry.fixedDelay(3, Duration.ofMillis(200))
                         .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
+                .doOnNext(rez -> LOG.debug("getMagic result strings are {}", rez))
                 .map(l -> toMagicItemsWithNotes(magic, l))
                 .doOnNext(rez -> LOG.debug("getMagic result size is {}", rez.size()));
     }
@@ -48,6 +49,8 @@ public class AipiCoService {
         return Mono.just(magicItemWithNotes)
                 .map(this::enrichMagicItems)
                 .map(this::findIndependentMagicItems)
+                .map(this::updateUntil)
+                .map(this::sortByUntil)
                 .doOnNext(l -> LOG.debug("Independent magicItems: {}",
                         l.stream().map(m -> m.magicItem().index()).toList()))
                 .flatMapIterable(Function.identity())
@@ -57,12 +60,14 @@ public class AipiCoService {
     }
 
     Flux<MagicItemWithNotes> solveMagicItemWithDependents(MagicItemWithNotes magicItemWithNotes){
-        LOG.debug("solveMagicItemWithDependents for MagicItem: {}", magicItemWithNotes.magicItem().index());
+        LOG.debug("solveMagicItemWithDependents for MagicItem: {} (until = {})",
+                magicItemWithNotes.magicItem().index(), magicItemWithNotes.until().get());
         return postMagic(magicItemWithNotes)
                 .map(MagicItemWithNotes::findReadyDependents)
                 .map(l -> l.stream()
                         .filter(m -> !m.pickedForRequest().getAndSet(true))
                         .toList())
+                .map(this::sortByUntil)
                 .doOnNext(l -> LOG.debug("Picked ready for request dependents of MagicItem: {}: {}",
                         magicItemWithNotes.magicItem().index(),
                         l.stream().map(m -> m.magicItem().index()).toList()))
@@ -135,6 +140,17 @@ public class AipiCoService {
     List<MagicItemWithNotes> findIndependentMagicItems(List<MagicItemWithNotes> magicItems){
         return magicItems.stream()
                 .filter(MagicItemWithNotes::isIndependent)
+                .toList();
+    }
+
+    List<MagicItemWithNotes> updateUntil(List<MagicItemWithNotes> magicItems){
+        magicItems.forEach(MagicItemWithNotes::updateUntilRecursively);
+        return magicItems;
+    }
+
+    List<MagicItemWithNotes> sortByUntil(List<MagicItemWithNotes> magicItems){
+        return magicItems.stream()
+                .sorted(Comparator.nullsLast(Comparator.comparing(m -> m.until().get())))
                 .toList();
     }
 
