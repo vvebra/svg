@@ -10,4 +10,8 @@ public record Barrier (String type,
     List<Integer> getDependencies(){
         return "dependency".equals(type) && on != null ? on : List.of();
     }
+
+    Long getUntil(){
+        return "time".equals(type) ? until : null;
+    }
 }
